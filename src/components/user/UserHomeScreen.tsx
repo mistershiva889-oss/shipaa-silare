@@ -6,6 +6,7 @@ import { FeedHeader } from './FeedHeader.tsx';
 import { CategoryChips } from './CategoryChips.tsx';
 import { VideoCard } from './VideoCard.tsx';
 import { UserProfileModal } from './UserProfileModal.tsx';
+import { PWAInstallButton } from '../common/PWAInstallButton.tsx';
 import { Video as VideoIcon, RefreshCw, AlertCircle } from 'lucide-react';
 
 interface UserHomeScreenProps {
@@ -95,6 +96,9 @@ export const UserHomeScreen: React.FC<UserHomeScreenProps> = ({ onSwitchToAdmin 
 
       {/* Main Feed (Normal vertical scrolling) */}
       <main className="flex-1 w-full max-w-2xl mx-auto px-0 sm:px-4 py-3 sm:py-6">
+        {/* PWA Install Banner to Remove Browser Bar / Run Fullscreen */}
+        <PWAInstallButton variant="banner" className="mx-3 sm:mx-0 mb-3" />
+
         {/* Error State with Retry Button */}
         {error && (
           <div className="m-4 p-5 rounded-2xl bg-rose-950/30 border border-rose-900/50 text-center">

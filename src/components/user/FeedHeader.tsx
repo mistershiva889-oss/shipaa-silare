@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { Search, X, Play } from 'lucide-react';
+import { PWAInstallButton } from '../common/PWAInstallButton.tsx';
 
 interface FeedHeaderProps {
   searchQuery: string;
@@ -67,7 +68,8 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
           </div>
 
           {/* Right Actions */}
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <PWAInstallButton variant="compact" />
 
             {/* Search Trigger Button */}
             <button

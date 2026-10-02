@@ -5,11 +5,11 @@
   "description": "Mobile-first video streaming application with clean in-card player, landscape rotation, and high-definition video playback.",
   "start_url": "/",
   "scope": "/",
-  "display": "standalone",
+  "display": "fullscreen",
   "display_override": [
+    "fullscreen",
     "standalone",
-    "window-controls-overlay",
-    "minimal-ui"
+    "window-controls-overlay"
   ],
   "orientation": "any",
   "theme_color": "#0a0d14",

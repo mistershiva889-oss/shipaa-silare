@@ -75,6 +75,64 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                 </span>
               </div>
             </div>
+            <div className="p-3 rounded-xl bg-[#0c0f17] border border-slate-800/70 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-rose-600/20 flex items-center justify-center text-rose-400">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <rect x="4" y="2" width="16" height="20" rx="2" strokeWidth="2" />
+                    <line x1="12" y1="18" x2="12.01" y2="18" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <div>
+                  <span className="block text-xs font-semibold text-slate-200">Auto Fullscreen</span>
+                  <span className="block text-[11px] text-slate-400">Auto expand on phone rotation</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const current = localStorage.getItem('streamvibe_auto_fullscreen') !== 'false';
+                  const next = !current;
+                  localStorage.setItem('streamvibe_auto_fullscreen', next ? 'true' : 'false');
+                  window.dispatchEvent(
+                    new CustomEvent('streamvibe_auto_fullscreen_changed', { detail: next })
+                  );
+                  // Force re-render
+                  (window as any)._streamvibe_af = next;
+                  const el = document.getElementById('af-toggle-knob');
+                  const bg = document.getElementById('af-toggle-bg');
+                  if (el && bg) {
+                    if (next) {
+                      bg.className = 'w-11 h-6 rounded-full transition-colors relative cursor-pointer bg-emerald-500';
+                      el.className = 'w-4 h-4 rounded-full bg-white transition-transform translate-x-6 top-1 left-1 absolute';
+                    } else {
+                      bg.className = 'w-11 h-6 rounded-full transition-colors relative cursor-pointer bg-slate-700';
+                      el.className = 'w-4 h-4 rounded-full bg-white transition-transform translate-x-0 top-1 left-1 absolute';
+                    }
+                  }
+                }}
+                className="focus:outline-none"
+                aria-label="Toggle auto fullscreen"
+              >
+                <div
+                  id="af-toggle-bg"
+                  className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
+                    localStorage.getItem('streamvibe_auto_fullscreen') !== 'false'
+                      ? 'bg-emerald-500'
+                      : 'bg-slate-700'
+                  }`}
+                >
+                  <div
+                    id="af-toggle-knob"
+                    className={`w-4 h-4 rounded-full bg-white transition-transform top-1 left-1 absolute ${
+                      localStorage.getItem('streamvibe_auto_fullscreen') !== 'false'
+                        ? 'translate-x-5'
+                        : 'translate-x-0'
+                    }`}
+                  />
+                </div>
+              </button>
+            </div>
           </div>
         </div>
 

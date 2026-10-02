@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   X,
   AlertTriangle,
+  Smartphone,
 } from 'lucide-react';
 
 interface VideoCardProps {
@@ -85,6 +86,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const [volume, setVolume] = useState(1);
   const [hasTrackedView, setHasTrackedView] = useState(false);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
+  const [thumbError, setThumbError] = useState(false);
 
   // "video one tap screen saf ho": Controls visibility state
   const [showControls, setShowControls] = useState(true);
@@ -92,6 +94,11 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   // Play Video Rotate & Fullscreen States
   const [isRotated, setIsRotated] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Auto Fullscreen on landscape rotation
+  const [autoFullscreen, setAutoFullscreen] = useState<boolean>(() => {
+    return localStorage.getItem('streamvibe_auto_fullscreen') !== 'false';
+  });
 
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -131,6 +138,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   }, [videoSrc, isPlaying]);
 
   // Start play handler
+  // Start play handler (Plays normally in card feed)
   const handleStartPlay = (e?: React.SyntheticEvent | Event) => {
     if (e) {
       e.stopPropagation();
@@ -262,25 +270,44 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     }
   };
 
-  // ONE TAP SCREEN SAFF HO:
-  // Single tap on the playing screen toggles controls visibility!
-  // Tap -> Screen is 100% clean video with zero buttons or overlays!
-  // Tap again -> Controls appear!
+  const lastTapRef = useRef<number>(0);
+  const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // ONE TAP SCREEN SAFF HO & DOUBLE-TAP AUTO FULLSCREEN:
+  // - Double tap anywhere on video: Instant Fullscreen toggle!
+  // - Single tap: Clean screen toggle (controls on / off)
   const handleScreenTap = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
     if (!isPlaying) {
       handleStartPlay();
       return;
     }
-    setShowControls((prev) => {
-      const next = !prev;
-      if (next) {
-        resetControlsTimeout();
-      } else if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-      }
-      return next;
-    });
+
+    const now = Date.now();
+    const timeSinceLastTap = now - lastTapRef.current;
+
+    // Detect double tap (within 300ms) -> Toggle Fullscreen
+    if (timeSinceLastTap < 300) {
+      if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
+      lastTapRef.current = 0;
+      toggleFullscreen();
+      return;
+    }
+
+    lastTapRef.current = now;
+    if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
+
+    tapTimeoutRef.current = setTimeout(() => {
+      setShowControls((prev) => {
+        const next = !prev;
+        if (next) {
+          resetControlsTimeout();
+        } else if (controlsTimeoutRef.current) {
+          clearTimeout(controlsTimeoutRef.current);
+        }
+        return next;
+      });
+    }, 240);
   };
 
   const handleTimeUpdate = () => {
@@ -389,10 +416,10 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     }
   };
 
-  // Standard Fullscreen Toggle Handler
-  const toggleFullscreen = async (e?: React.SyntheticEvent) => {
+  // Standard & Auto Fullscreen Toggle Handler
+  const toggleFullscreen = async (e?: React.SyntheticEvent, forceState?: boolean) => {
     if (e) e.stopPropagation();
-    const nextState = !isFullscreen;
+    const nextState = forceState !== undefined ? forceState : !isFullscreen;
     setIsFullscreen(nextState);
     resetControlsTimeout();
 
@@ -441,6 +468,60 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       }
     } catch {}
   };
+
+  // Listen for auto-fullscreen preference broadcasts
+  useEffect(() => {
+    const handlePrefChange = (e: any) => {
+      if (typeof e.detail === 'boolean') {
+        setAutoFullscreen(e.detail);
+      }
+    };
+    window.addEventListener('streamvibe_auto_fullscreen_changed', handlePrefChange);
+    return () => {
+      window.removeEventListener('streamvibe_auto_fullscreen_changed', handlePrefChange);
+    };
+  }, []);
+
+  // AUTO FULLSCREEN: When device is rotated to landscape, automatically go fullscreen!
+  // When rotated back to portrait, automatically exit fullscreen!
+  useEffect(() => {
+    if (!autoFullscreen || !isPlaying) return;
+
+    const checkOrientation = () => {
+      const isLandscape =
+        window.innerWidth > window.innerHeight ||
+        (window.screen.orientation && window.screen.orientation.type.includes('landscape')) ||
+        Math.abs(((window as any).orientation as number) || 0) === 90;
+
+      if (isLandscape && !isFullscreen && !isRotated) {
+        toggleFullscreen(undefined, true);
+      } else if (!isLandscape && isFullscreen) {
+        exitAllExpanded();
+      }
+    };
+
+    // Check after brief delay to let viewport settle
+    const initialTimer = setTimeout(checkOrientation, 350);
+
+    const handleRotation = () => {
+      setTimeout(checkOrientation, 150);
+    };
+
+    if (screen.orientation) {
+      screen.orientation.addEventListener('change', handleRotation);
+    }
+    window.addEventListener('orientationchange', handleRotation);
+    window.addEventListener('resize', handleRotation);
+
+    return () => {
+      clearTimeout(initialTimer);
+      if (screen.orientation) {
+        screen.orientation.removeEventListener('change', handleRotation);
+      }
+      window.removeEventListener('orientationchange', handleRotation);
+      window.removeEventListener('resize', handleRotation);
+    };
+  }, [autoFullscreen, isPlaying, isFullscreen, isRotated]);
 
   // Close video button
   const handleCloseVideo = (e?: React.SyntheticEvent) => {
@@ -537,13 +618,13 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                 - scale(1.16) inside overflow:hidden crops off YouTube's top title bar
                 - pointer-events-none: all taps hit our transparent layer for "one tap screen saf ho"
               */
-              <div className="absolute inset-0 overflow-hidden flex items-center justify-center pointer-events-none">
+              <div className="absolute inset-0 overflow-hidden flex items-center justify-center pointer-events-none bg-black">
                 <iframe
                   ref={iframeRef}
                   title={video.title}
                   src={`https://www.youtube-nocookie.com/embed/${video.youtubeId}?autoplay=1&controls=0&modestbranding=1&rel=0&iv_load_policy=3&playsinline=1&enablejsapi=1&disablekb=1&fs=0`}
-                  className="w-[116%] h-[116%] max-w-none border-0 select-none"
-                  style={{ transform: 'scale(1.15)', transformOrigin: 'center center' }}
+                  className="w-[126%] h-[138%] max-w-none border-none select-none relative -top-[17%]"
+                  style={{ transform: 'scale(1.2)', transformOrigin: 'center center' }}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 />
               </div>
@@ -602,17 +683,17 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             >
               {/* Top Bar with Title, Close, Rotate Video Button & Fullscreen */}
               <div className="flex items-center justify-between text-white w-full gap-2 pointer-events-auto">
-                <div className="flex items-center gap-2 max-w-[55%] min-w-0">
-                  {/* Close / Return button */}
+                <div className="flex items-center gap-2.5 max-w-[60%] min-w-0">
+                  {/* Close / Return to feed button */}
                   <button
                     onClick={handleCloseVideo}
-                    aria-label="Close or back to feed"
-                    title="Close video"
-                    className="p-2 rounded-xl bg-black/75 hover:bg-black text-white cursor-pointer shrink-0 border border-white/20 active:scale-95"
+                    aria-label="Close video"
+                    title="Close and return to feed"
+                    className="p-2.5 rounded-xl bg-black/80 hover:bg-black text-white cursor-pointer shrink-0 border border-white/20 active:scale-95 shadow-lg"
                   >
-                    {isExpanded ? <ArrowLeft className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                    <ArrowLeft className="w-4 h-4" />
                   </button>
-                  <span className="text-xs sm:text-sm font-semibold truncate drop-shadow-md">
+                  <span className="text-xs sm:text-sm font-semibold truncate drop-shadow-md text-slate-100">
                     {video.title}
                   </span>
                 </div>
@@ -776,14 +857,21 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           /* Thumbnail Preview (Zero YouTube Logo) */
           <div
             onClick={handleStartPlay}
-            className="relative w-full h-full cursor-pointer group select-none"
+            className="relative w-full h-full cursor-pointer group select-none bg-black"
           >
-            <img
-              src={video.thumbnailUrl}
-              alt={video.title}
-              referrerPolicy="no-referrer"
-              className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
-            />
+            {thumbError || !video.thumbnailUrl ? (
+              <div className="w-full h-full bg-slate-900 bg-gradient-to-tr from-slate-950 via-[#0d1019] to-rose-950/40 flex items-center justify-center">
+                <Play className="w-12 h-12 text-rose-500/20" />
+              </div>
+            ) : (
+              <img
+                src={video.thumbnailUrl}
+                alt=""
+                onError={() => setThumbError(true)}
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
+              />
+            )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/30 flex items-center justify-center">
               <button
                 onClick={handleStartPlay}

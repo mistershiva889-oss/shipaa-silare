@@ -3,7 +3,9 @@ import path from 'path';
 import crypto from 'crypto';
 import { User, Video, Category, VideoViewAnalytics, AdminUser, AdminActivityLog, AppSettings, DashboardStats } from '../src/types/index.ts';
 
-const DATA_DIR = path.resolve(process.cwd(), 'data');
+const DATA_DIR = process.env.VERCEL
+  ? path.resolve('/tmp', 'data')
+  : path.resolve(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'database.json');
 
 interface StoredAdmin extends AdminUser {
